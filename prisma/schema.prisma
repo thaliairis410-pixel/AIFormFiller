@@ -1,0 +1,73 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+enum FormStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum FailureReason {
+  TIMEOUT
+  INVALID_DATA
+  SERVER_ERROR
+  RECAPTCHA_DETECTED
+}
+
+model Form {
+  id             String    @id @default(auto()) @map("_id") @db.ObjectId
+  domain         String
+  email          String
+  status         FormStatus @default(PENDING)
+
+  firstContacted DateTime?
+  lastContacted  DateTime?
+  attempts       Int        @default(0)
+  failureReason  FailureReason?
+  submissions    Submission[]
+
+  responded      Boolean    @default(false)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@index([domain])
+  @@index([status])
+  @@index([email])
+}
+
+model Submission {
+  id            String        @id @default(auto()) @map("_id") @db.ObjectId
+  form          Form          @relation(fields: [formId], references: [id])
+  formId        String        @db.ObjectId
+
+  fullName      String
+  email         String
+  phone         String
+  companyName   String
+  position      String
+  address       String?
+  message       String
+
+  failed        Boolean        @default(false)
+  failureReason FailureReason?
+
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model User {
+  id           String    @id @default(auto()) @map("_id") @db.ObjectId
+  email        String    @unique
+  passwordHash String
+  lastLogin    DateTime?
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}

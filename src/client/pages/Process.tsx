@@ -12,7 +12,10 @@ const Process = () => {
 	const errorClassName = "bg-red-50 border-red-300 outline-red-500";
 	const validClassName = "border-zinc-300 bg-transparent";
 
-	const submit = (form: FieldValues) => alert("Submitted!");
+	const submit = (form: FieldValues) => {
+		form;
+		alert("Submitted!");
+	};
 
 	return (
 		<section className="p-6">
