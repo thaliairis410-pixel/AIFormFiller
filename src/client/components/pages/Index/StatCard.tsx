@@ -1,4 +1,4 @@
-import type { StatCardProps } from "../types.d";
+import type { StatCardProps } from "../../../types";
 
 const StatCard = ({ title, value, icon, color }: StatCardProps) => {
 	return (
