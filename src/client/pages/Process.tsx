@@ -19,12 +19,9 @@ const Process = () => {
 			<div className="container space-y-6">
 				<h2 className="text-2xl font-bold">Process Emails</h2>
 
-				<div className="container grid grid-cols-2 gap-6">
-					<div>
-						<form
-							onSubmit={handleSubmit(submit)}
-							className="bg-white border border-zinc-300 p-6 rounded-xl space-y-3"
-						>
+				<div className="container grid grid-cols-1 md:grid-cols-2 gap-6">
+					<div className="bg-white border border-zinc-300 p-6 rounded-xl">
+						<form onSubmit={handleSubmit(submit)} className="space-y-3">
 							<div
 								className="bg-zinc-100 border border-dashed rounded-xl border-zinc-300 p-6 text-center
 							 text-sm text-zinc-600"
@@ -206,6 +203,13 @@ const Process = () => {
 								Submit for Processing
 							</button>
 						</form>
+					</div>
+
+					<div className="bg-white border border-zinc-300 p-6 rounded-xl space-y-3">
+						<h3 className="text-lg font-semibold">Processing Queue</h3>
+						<div className="my-12 text-sm text-zinc-500 text-center">
+							Nothing in queue
+						</div>
 					</div>
 				</div>
 			</div>
