@@ -9,7 +9,7 @@
     "build": "vite build"
   },
   "dependencies": {
-    "@fontsource/lato": "^5.2.7",
+    "@fontsource/outfit": "^5.2.8",
     "@tailwindcss/vite": "^4.2.1",
     "cross-env": "^7.0.3",
     "express": "^5.1.0",

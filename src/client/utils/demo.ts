@@ -39,18 +39,6 @@ export const stats = {
 		{ month: "Jun", sent: 367, responses: 91 },
 	],
 
-	// Domain Stats
-	topDomains: [
-		{ domain: "gmail.com", count: 342, success: 187 },
-		{ domain: "yahoo.com", count: 156, success: 89 },
-		{ domain: "outlook.com", count: 134, success: 71 },
-		{ domain: "company.com", count: 98, success: 45 },
-		{ domain: "business.net", count: 76, success: 38 },
-		{ domain: "orgmail.org", count: 54, success: 29 },
-		{ domain: "edu.edu", count: 42, success: 21 },
-		{ domain: "gov.gov", count: 28, success: 12 },
-	],
-
 	// Status Distribution
 	statusDistribution: [
 		{ status: "Pending", count: 431, color: "#ff9800" },
@@ -60,15 +48,6 @@ export const stats = {
 		{ status: "Failed", count: 312, color: "#f44336" },
 		{ status: "Expired", count: 42, color: "#757575" },
 	],
-
-	// Response Rate by Day
-	responseRate: {
-		average: "27.8%",
-		bestDay: "Wednesday",
-		bestRate: "34.2%",
-		worstDay: "Sunday",
-		worstRate: "12.5%",
-	},
 
 	// Processing Stats
 	processingSpeed: {
@@ -98,16 +77,6 @@ export const stats = {
 		{ date: "Week 6", rate: 75 },
 		{ date: "Week 7", rate: 74 },
 		{ date: "Week 8", rate: 78 },
-	],
-
-	// Geographic Distribution (if available)
-	geographicStats: [
-		{ region: "North America", count: 456, success: 312 },
-		{ region: "Europe", count: 389, success: 267 },
-		{ region: "Asia", count: 234, success: 156 },
-		{ region: "Australia", count: 98, success: 67 },
-		{ region: "South America", count: 45, success: 28 },
-		{ region: "Africa", count: 28, success: 15 },
 	],
 };
 
