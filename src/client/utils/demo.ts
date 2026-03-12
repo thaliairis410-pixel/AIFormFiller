@@ -90,7 +90,6 @@ export const recentActivity = [
 		domain: "company1.com",
 		status: "success",
 		time: "2 minutes ago",
-		response: "Form submitted successfully",
 		duration: "45s",
 	},
 	{
@@ -99,7 +98,6 @@ export const recentActivity = [
 		domain: "business2.net",
 		status: "failed",
 		time: "5 minutes ago",
-		response: "No contact form found",
 		duration: "23s",
 	},
 	{
@@ -108,7 +106,6 @@ export const recentActivity = [
 		domain: "startup3.io",
 		status: "processing",
 		time: "7 minutes ago",
-		response: "Filling form...",
 		duration: "1m 12s",
 	},
 	{
@@ -117,7 +114,6 @@ export const recentActivity = [
 		domain: "agency4.com",
 		status: "success",
 		time: "12 minutes ago",
-		response: "Message sent, auto-reply received",
 		duration: "58s",
 	},
 	{
@@ -126,7 +122,6 @@ export const recentActivity = [
 		domain: "shop5.online",
 		status: "captcha",
 		time: "15 minutes ago",
-		response: "CAPTCHA detected - skipped",
 		duration: "34s",
 	},
 	{
@@ -135,7 +130,6 @@ export const recentActivity = [
 		domain: "tech6.org",
 		status: "success",
 		time: "18 minutes ago",
-		response: "Form submitted successfully",
 		duration: "41s",
 	},
 	{
@@ -144,7 +138,6 @@ export const recentActivity = [
 		domain: "edu7.edu",
 		status: "pending",
 		time: "22 minutes ago",
-		response: "Queued for processing",
 		duration: "0s",
 	},
 	{
@@ -153,7 +146,6 @@ export const recentActivity = [
 		domain: "gov8.gov",
 		status: "failed",
 		time: "25 minutes ago",
-		response: "Form submission failed - validation error",
 		duration: "1m 34s",
 	},
 ];

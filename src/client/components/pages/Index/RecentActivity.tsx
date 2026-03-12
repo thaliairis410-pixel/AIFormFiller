@@ -28,7 +28,7 @@ const RecentActivity = () => {
 					</Link>
 				</div>
 
-				<div className="border border-zinc-300 rounded-2xl overflow-auto">
+				<div className="border border-zinc-300 bg-white rounded-2xl overflow-auto">
 					<div
 						style={{
 							gridTemplateColumns: `repeat(${headings.length}, minmax(100px, 1fr))`,
@@ -81,10 +81,7 @@ const RecentActivity = () => {
 								<p className="py-2 px-6 border-r border-zinc-300">
 									{activity.time}
 								</p>
-								<p className="py-2 px-6 border-r border-zinc-300">
-									{activity.response}
-								</p>
-								<p className="py-2 px-6 text-right">{activity.duration}</p>
+								<p className="py-2 px-6">{activity.duration}</p>
 							</div>
 						))}
 					</div>
