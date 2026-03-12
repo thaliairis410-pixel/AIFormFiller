@@ -1,0 +1,35 @@
+{
+  "name": "ai-form-filler",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "nodemon -w src/server -x tsx src/server/main.ts",
+    "start": "cross-env NODE_ENV=production tsx src/server/main.ts",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@fontsource/lato": "^5.2.7",
+    "@tailwindcss/vite": "^4.2.1",
+    "cross-env": "^7.0.3",
+    "express": "^5.1.0",
+    "lucide-react": "^0.577.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-hook-form": "^7.71.2",
+    "react-router": "^7.13.1",
+    "tailwindcss": "^4.2.1",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.3",
+    "vite-express": "*"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.1",
+    "@types/node": "^22.15.2",
+    "@types/react": "^19.1.2",
+    "@types/react-dom": "^19.1.2",
+    "@vitejs/plugin-react": "^4.4.1",
+    "nodemon": "^3.1.10",
+    "vite": "^6.3.3"
+  }
+}
