@@ -2,10 +2,10 @@
 @import "@fontsource/outfit";
 
 html {
-    font-family: "Outfit", sans-serif;
+  font-family: "Outfit", sans-serif;
 }
 
 .container {
-    max-width: 1152px;
-    margin: 0 auto;
+  max-width: 1152px;
+  margin: 0 auto;
 }

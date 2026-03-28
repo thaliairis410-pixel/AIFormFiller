@@ -1,0 +1,117 @@
+import { appendFile, readFile } from "node:fs/promises";
+import { join } from "node:path";
+import type formidable from "formidable";
+import type { Submission } from "../../../generated/prisma/client.js";
+import prisma from "../utils/prisma.util.js";
+import processDomains from "../utils/process-domains.util.js";
+
+export default class ApiService {
+  static async handleUpload(
+    files: formidable.Files,
+    fields: formidable.Fields,
+  ) {
+    try {
+      const parsedFields = {} as Record<string, string>;
+      Object.keys(fields).forEach((key) => {
+        parsedFields[key] = fields[key]?.[0] || "";
+      });
+
+      const parsedFiles = Object.values(files).flat();
+      let domains: string[] = [];
+
+      if (parsedFiles.length) {
+        domains = (
+          await Promise.all(
+            parsedFiles.map(async (file) =>
+              file ? processDomains(await readFile(file.filepath, "utf8")) : "",
+            ),
+          )
+        ).flat();
+      }
+
+      await prisma.submission.createMany({
+        data: domains.map((domain) => ({
+          status: "PENDING",
+          domain,
+        })),
+      });
+
+      return { success: true, data: { domains, fields: parsedFields } };
+    } catch (error) {
+      await appendFile(
+        join(
+          process.cwd(),
+          "logs",
+          `failed_upload-${new Date().toDateString()}.txt`,
+        ),
+        `Failed to process upload at ${new Date().toISOString()}\n${error}`,
+        "utf-8",
+      );
+      return { success: false, error: "Failed to process upload" };
+    }
+  }
+
+  static async getSubmissionStatus({
+    page,
+    limit,
+    domains,
+  }: Partial<{
+    page: number;
+    limit: number;
+    domains: string[];
+  }>) {
+    try {
+      if (domains) {
+        const data = await prisma.submission.findMany({
+          where: { domain: { in: domains } },
+        });
+        return { success: true, data };
+      }
+
+      const LIMIT = limit || 100;
+      const PAGE = page || 1;
+
+      const data = await prisma.submission.findMany({
+        take: LIMIT,
+        skip: (PAGE - 1) * LIMIT,
+      });
+
+      return { success: true, data };
+    } catch (error) {
+      await appendFile(
+        join(
+          process.cwd(),
+          "logs",
+          `failed_fetch-${new Date().toDateString()}.txt`,
+        ),
+        `Failed to fetch submission data at ${new Date().toISOString()}\n${error}`,
+        "utf-8",
+      );
+      return { success: false, error: "Failed to fetch submission data" };
+    }
+  }
+
+  async updateSubmissionStatus(
+    domains: string[],
+    updates: Pick<Submission, "status" | "failureReason">,
+  ) {
+    try {
+      const { count } = await prisma.submission.updateMany({
+        where: { domain: { in: domains } },
+        data: updates,
+      });
+      return { success: true, data: { documentsAffected: count } };
+    } catch (error) {
+      await appendFile(
+        join(
+          process.cwd(),
+          "logs",
+          `failed_update-${new Date().toDateString()}.txt`,
+        ),
+        `Failed to update submission data at ${new Date().toISOString()}\nThe update:\n${updates}\nThe domains:\n${domains}\n${error}`,
+        "utf-8",
+      );
+      return { success: false, error: "Failed to update submission data" };
+    }
+  }
+}
