@@ -17,11 +17,17 @@ export default class ApiController {
   }
 
   static async getSubmissionStatus(req: Request, res: Response) {
-    const { page, limit, domains } = req.body as {
-      page?: number;
-      limit?: number;
+    const { domains } = (req.body || {}) as {
       domains?: string[];
     };
+    const { page, limit } = (req.query || {}) as {
+      page?: number;
+      limit?: number;
+    };
     res.json(await ApiService.getSubmissionStatus({ page, limit, domains }));
+  }
+
+  static async getStats(_: Request, res: Response) {
+    res.json(await ApiService.getStats());
   }
 }

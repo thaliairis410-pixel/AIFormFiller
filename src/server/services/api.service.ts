@@ -1,7 +1,10 @@
 import { appendFile, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type formidable from "formidable";
-import type { Submission } from "../../../generated/prisma/client.js";
+import {
+  type Submission,
+  SubmissionStatus,
+} from "../../../generated/prisma/client.js";
 import prisma from "../utils/prisma.util.js";
 import processDomains from "../utils/process-domains.util.js";
 
@@ -68,15 +71,18 @@ export default class ApiService {
         return { success: true, data };
       }
 
-      const LIMIT = limit || 100;
-      const PAGE = page || 1;
+      const LIMIT = Number(limit) || 100;
+      const PAGE = Number(page) || 1;
 
-      const data = await prisma.submission.findMany({
-        take: LIMIT,
-        skip: (PAGE - 1) * LIMIT,
-      });
+      const [total, queue] = await Promise.all([
+        prisma.submission.count(),
+        prisma.submission.findMany({
+          take: LIMIT,
+          skip: (PAGE - 1) * LIMIT,
+        }),
+      ]);
 
-      return { success: true, data };
+      return { success: true, data: { total, queue } };
     } catch (error) {
       await appendFile(
         join(
@@ -112,6 +118,60 @@ export default class ApiService {
         "utf-8",
       );
       return { success: false, error: "Failed to update submission data" };
+    }
+  }
+
+  static async getStats() {
+    try {
+      const [total, successful, failed, contacted, recentActivityRaw] =
+        await Promise.all([
+          prisma.submission.count(),
+          prisma.submission.count({
+            where: { status: SubmissionStatus.SUCCESS },
+          }),
+          prisma.submission.count({
+            where: { status: SubmissionStatus.FAILED },
+          }),
+          prisma.submission.count({
+            where: { status: { not: SubmissionStatus.PENDING } },
+          }),
+          prisma.submission.findMany({
+            orderBy: { createdAt: "desc" },
+            take: 20,
+          }),
+        ]);
+
+      const recentActivity = recentActivityRaw.map((item) => ({
+        id: item.id,
+        status: item.status,
+        domain: item.domain,
+        failureReason: item.failureReason || undefined,
+        createdAt: item.createdAt.toISOString(),
+        updatedAt: item.updatedAt?.toISOString(),
+      }));
+
+      return {
+        success: true,
+        data: {
+          total,
+          successful,
+          failed,
+          contacted,
+          recentActivity,
+        },
+      };
+    } catch (error) {
+      await appendFile(
+        join(
+          process.cwd(),
+          "logs",
+          `failed_stats-${new Date().toDateString()}.txt`,
+        ),
+        `Failed to fetch stats at ${new Date().toISOString()}\n${error}`,
+        "utf-8",
+      );
+
+      return { success: false, error: "Failed to fetch stats" };
     }
   }
 }

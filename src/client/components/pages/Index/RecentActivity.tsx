@@ -1,91 +1,74 @@
 import { ArrowRight } from "lucide-react";
 import { Link } from "react-router";
-import { recentActivity } from "../../../utils/demo";
+import type { StatsData } from "../../../types";
+import getStatusColor from "../../../utils/get-status-color";
 
-const RecentActivity = () => {
-  const headings = Object.keys(recentActivity[0]);
-
-  const getStatusColor = (status: string): string => {
-    if (status === "success") {
-      return "text-green-600";
-    } else if (status === "pending") {
-      return "text-yellow-600";
-    } else {
-      return "text-red-600";
-    }
+const RecentActivity = ({ recentActivity }: StatsData) => {
+  const formatDate = (iso: string) => {
+    return new Date(iso).toLocaleString(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
   };
 
   return (
     <section className="p-6">
       <div className="container space-y-6">
-        <div className="flex justify-between">
+        <div className="flex justify-between items-center">
           <h2 className="text-2xl font-bold">Recent Activity</h2>
           <Link
-            className="bg-blue-600 text-white text-sm px-3 py-1 rounded-md inline-flex items-center gap-2"
+            className="bg-blue-600 text-white text-sm px-3 py-1.5 rounded-md inline-flex items-center gap-2 hover:bg-blue-700 transition"
             to="/history"
           >
             View All <ArrowRight size={14} />
           </Link>
         </div>
 
-        <div className="border border-zinc-300 bg-white rounded-2xl overflow-auto">
-          <div
-            style={{
-              gridTemplateColumns: `repeat(${headings.length}, minmax(100px, 1fr))`,
-            }}
-            className="grid border-b border-zinc-300 font-semibold min-w-fit"
-          >
-            {headings.map((heading) => (
-              <p
-                key={heading}
-                className="capitalize py-2 px-6 not-last-of-type:border-r border-zinc-300"
-              >
-                {heading}
-              </p>
-            ))}
+        {recentActivity.length === 0 ? (
+          <div className="border border-zinc-300 bg-white rounded-2xl p-12 text-center text-sm text-zinc-400">
+            No recent activity found.
           </div>
+        ) : (
+          <div className="border border-zinc-300 bg-white rounded-2xl overflow-auto">
+            <div className="grid grid-cols-[1fr_2fr_1fr_1fr] border-b border-zinc-300 font-semibold text-sm min-w-[540px]">
+              <p className="py-3 px-6 border-r border-zinc-300">ID</p>
+              <p className="py-3 px-6 border-r border-zinc-300">Domain</p>
+              <p className="py-3 px-6 border-r border-zinc-300">Status</p>
+              <p className="py-3 px-6">Created</p>
+            </div>
 
-          <div className="min-w-fit">
-            {recentActivity.map((activity) => (
-              <div
-                style={{
-                  gridTemplateColumns: `repeat(${headings.length}, minmax(100px, 1fr))`,
-                }}
-                className="grid min-w-full odd:bg-zinc-100 not-last-of-type:border-b border-zinc-300 hover:bg-zinc-200 transition *:whitespace-nowrap *:overflow-hidden *:text-ellipsis"
-                key={activity.id}
-              >
-                <p className="py-2 px-6 border-r border-zinc-300">
-                  {activity.id}
-                </p>
-                <p className="py-2 px-6 border-r border-zinc-300">
-                  <a
-                    href={`mailto:${activity.email}`}
-                    className="text-blue-600 hover:underline"
-                  >
-                    {activity.email}
-                  </a>
-                </p>
-                <p className="py-2 px-6 border-r border-zinc-300">
-                  <a
-                    href={activity.domain}
-                    className="text-blue-600 hover:underline"
-                  >
-                    {activity.domain}
-                  </a>
-                </p>
-                <p
-                  className={`${getStatusColor(activity.status)} capitalize py-2 px-6 border-r border-zinc-300`}
+            <div className="min-w-[540px]">
+              {recentActivity.map((item) => (
+                <div
+                  key={item.id}
+                  className="grid grid-cols-[1fr_2fr_1fr_1fr] odd:bg-zinc-50 not-last-of-type:border-b border-zinc-300 hover:bg-zinc-100 transition text-sm"
                 >
-                  {activity.status}
-                </p>
-                <p className="py-2 px-6 border-r border-zinc-300">
-                  {activity.time}
-                </p>
-                <p className="py-2 px-6">{activity.duration}</p>
-              </div>
-            ))}
+                  <p className="py-3 px-6 border-r border-zinc-300 font-mono text-zinc-500 truncate">
+                    {item.id}
+                  </p>
+                  <p className="py-3 px-6 border-r border-zinc-300 truncate">
+                    <a
+                      href={`https://${item.domain}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-blue-600 hover:underline"
+                    >
+                      {item.domain}
+                    </a>
+                  </p>
+                  <p
+                    className={`py-3 px-6 border-r border-zinc-300 font-medium ${getStatusColor(item.status)}`}
+                  >
+                    {item.status}
+                  </p>
+                  <p className="py-3 px-6 text-zinc-500 truncate">
+                    {formatDate(item.createdAt)}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </section>
   );

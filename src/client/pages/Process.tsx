@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import useProcessActivity from "../hooks/useProcessActivity";
+import type { QueueItem } from "../types";
 import getSubmissionStatus from "../utils/get-submission-status";
 import upload from "../utils/upload";
 
 const Process = () => {
+  const { queue, setQueue } = useProcessActivity();
+
   const defaultValues = {
     fullName: "John Doe",
     email: "johndoe@example.com",
@@ -27,22 +31,23 @@ const Process = () => {
 
   const [domains, setDomains] = useState<string[]>();
   const [submitting, setSubmitting] = useState(false);
-  const [updates, setUpdates] = useState<any[]>();
 
   useEffect(() => {
     let timeout: NodeJS.Timeout | undefined;
-    async function getLiveUpdates() {
-      if (timeout) {
-        clearTimeout(timeout);
-      }
 
-      const updates = await getSubmissionStatus({ domains: domains! });
-      console.log(updates);
+    async function getLiveUpdates() {
+      if (timeout) clearTimeout(timeout);
+
+      const updates: QueueItem[] | null = await getSubmissionStatus({
+        domains: domains!,
+      });
+
       if (updates === null) {
         toast.warning("Failed to fetch live updates. Retrying in 5s...");
+      } else {
+        setQueue(updates);
       }
 
-      setUpdates(updates);
       timeout = setTimeout(getLiveUpdates, 5000);
     }
 
@@ -51,11 +56,34 @@ const Process = () => {
     }
 
     return () => clearTimeout(timeout);
-  }, [domains]);
+  }, [domains, setQueue]);
 
-  const onSuccess = useCallback((domains: string[]) => {
-    setDomains(domains);
-  }, []);
+  const onSuccess = useCallback(
+    (domains: string[]) => {
+      // Optimistically seed the queue as PENDING
+      const initial: QueueItem[] = domains.map((domain) => ({
+        id: domain,
+        domain,
+        status: "PENDING",
+        createdAt: new Date().toISOString(),
+      }));
+      setQueue(initial);
+      setDomains(domains);
+    },
+    [setQueue],
+  );
+
+  const getStatusColor = (status: QueueItem["status"]) => {
+    if (status === "PENDING") return "text-yellow-500";
+    if (status === "FAILED") return "text-red-500";
+    return "text-green-500";
+  };
+
+  const getStatusBg = (status: QueueItem["status"]) => {
+    if (status === "PENDING") return "bg-yellow-50 ring-yellow-200";
+    if (status === "FAILED") return "bg-red-50 ring-red-200";
+    return "bg-green-50 ring-green-200";
+  };
 
   return (
     <section className="p-6">
@@ -63,6 +91,7 @@ const Process = () => {
         <h2 className="text-2xl font-bold md:sticky top-24">Process Emails</h2>
 
         <div className="container grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Form */}
           <div className="bg-white border border-zinc-300 p-6 rounded-xl h-fit md:sticky top-38">
             <form
               onSubmit={handleSubmit(async (_, e) => {
@@ -72,10 +101,8 @@ const Process = () => {
               })}
               className="space-y-3"
             >
-              <div
-                className="bg-zinc-100 border border-dashed rounded-xl border-zinc-300 p-6 text-center
-							 text-sm text-zinc-600"
-              >
+              {/* File upload */}
+              <div className="bg-zinc-100 border border-dashed rounded-xl border-zinc-300 p-6 text-center text-sm text-zinc-600">
                 <div>Drag & drop CSV/TXT file</div>
                 <div>or</div>
                 <button
@@ -94,6 +121,7 @@ const Process = () => {
                 />
               </div>
 
+              {/* Full Name */}
               <div className="flex flex-col text-sm gap-1">
                 <label htmlFor="full-name">
                   Full Name<sup className="text-red-400">*</sup>
@@ -119,6 +147,7 @@ const Process = () => {
                 )}
               </div>
 
+              {/* Email */}
               <div className="flex flex-col text-sm gap-1">
                 <label htmlFor="email">
                   Email<sup className="text-red-400">*</sup>
@@ -144,6 +173,7 @@ const Process = () => {
                 )}
               </div>
 
+              {/* Phone */}
               <div className="flex flex-col text-sm gap-1">
                 <label htmlFor="phone-number">
                   Phone Number<sup className="text-red-400">*</sup>
@@ -162,7 +192,7 @@ const Process = () => {
                   type="tel"
                   id="phone-number"
                   placeholder="+19023839"
-                  className={`${errors.phoneNumber ? errorClassName : validClassName} p-3 border rounded-xl capitalize`}
+                  className={`${errors.phoneNumber ? errorClassName : validClassName} p-3 border rounded-xl`}
                 />
                 {errors.phoneNumber && (
                   <div className="text-red-400 text-xs">
@@ -171,7 +201,8 @@ const Process = () => {
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-6">
+              {/* Company + Position */}
+              <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col text-sm gap-1">
                   <label htmlFor="company-name">
                     Company Name<sup className="text-red-400">*</sup>
@@ -225,6 +256,7 @@ const Process = () => {
                 </div>
               </div>
 
+              {/* Address */}
               <div className="flex flex-col text-sm gap-1">
                 <label htmlFor="address">
                   Address<sup className="text-red-400">*</sup>
@@ -248,8 +280,9 @@ const Process = () => {
                 )}
               </div>
 
+              {/* Message */}
               <div className="flex flex-col text-sm gap-1">
-                <label htmlFor="address">
+                <label htmlFor="message">
                   Message<sup className="text-red-400">*</sup>
                 </label>
                 <textarea
@@ -259,11 +292,11 @@ const Process = () => {
                       message: "Message cannot be empty",
                     },
                   })}
-                  id="address"
+                  id="message"
                   placeholder="Hi, I'm John Doe..."
                   rows={4}
                   className={`${errors.message ? errorClassName : validClassName} p-3 border rounded-xl capitalize`}
-                ></textarea>
+                />
                 {errors.message && (
                   <div className="text-red-400 text-xs">
                     {errors.message.message as string}
@@ -272,7 +305,7 @@ const Process = () => {
               </div>
 
               <button
-                className="text-sm bg-blue-600 text-white p-2 cursor-pointer transition active:scale-95 rounded-xl w-full"
+                className="text-sm bg-blue-600 text-white p-2 cursor-pointer transition active:scale-95 rounded-xl w-full hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
                 disabled={submitting}
                 type="submit"
               >
@@ -281,24 +314,35 @@ const Process = () => {
             </form>
           </div>
 
-          <div className="bg-white border border-zinc-300 p-6 rounded-xl space-y-3">
-            <h3 className="text-lg font-semibold">Processing Queue</h3>
-            {updates?.length === 0 ? (
-              <div className="my-12 text-sm text-zinc-500 text-center">
-                Nothing in queue
+          {/* Queue Panel */}
+          <div className="bg-white border border-zinc-300 p-6 rounded-xl space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Processing Queue</h3>
+              {queue && queue.length > 0 && (
+                <span className="text-xs text-zinc-400 bg-zinc-100 px-2 py-0.5 rounded-full border border-zinc-200">
+                  {queue.length} domain{queue.length !== 1 ? "s" : ""}
+                </span>
+              )}
+            </div>
+
+            {!queue || queue.length === 0 ? (
+              <div className="my-12 text-sm text-zinc-400 text-center">
+                Nothing in queue. Upload a file to begin.
               </div>
             ) : (
-              <div className="space-y-2">
-                {updates?.map((update) => (
+              <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1">
+                {queue.map((item) => (
                   <div
-                    className="flex justify-between bg-zinc-100 p-2 rounded-sm"
-                    key={update.id}
+                    key={item.id}
+                    className={`flex justify-between items-center p-3 rounded-lg ring-1 ${getStatusBg(item.status)}`}
                   >
-                    <div>{update.domain}</div>
+                    <div className="text-sm text-zinc-700 truncate">
+                      {item.domain}
+                    </div>
                     <div
-                      className={`${update.status === "PENDING" ? "text-yellow-400" : update.status === "FAILED" ? "text-red-400" : "text-green-400"} text-sm`}
+                      className={`text-xs font-semibold ml-4 shrink-0 ${getStatusColor(item.status)}`}
                     >
-                      {update.status}
+                      {item.status}
                     </div>
                   </div>
                 ))}

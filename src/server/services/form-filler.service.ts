@@ -290,17 +290,6 @@ export default class FormFiller {
       return { success: false, reason: "No contact page found" };
     }
 
-    const hasProtection =
-      data.protection && Object.values(data.protection).some(Boolean);
-    if (hasProtection) {
-      await BrowserService.closePage(page);
-      return {
-        success: false,
-        reason: "CAPTCHA or bot protection detected",
-        protection: data.protection,
-      };
-    }
-
     if (data.foundContactFormOnPage) {
       const result = await FormFiller.fillForm(page, data);
       await BrowserService.closePage(page);

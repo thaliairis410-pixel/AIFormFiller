@@ -1,8 +1,8 @@
 import { Mail, MailCheck, MailQuestion, MailWarning } from "lucide-react";
-import { stats } from "../../../utils/demo";
+import type { StatsData } from "../../../types";
 import StatCard from "./StatCard";
 
-const Stats = () => {
+const Stats = (stats: StatsData) => {
   return (
     <section className="p-6">
       <div className="container space-y-6">
@@ -17,19 +17,19 @@ const Stats = () => {
           />
           <StatCard
             title="Contacted"
-            value={stats?.contacted}
+            value={stats.contacted}
             icon={<MailQuestion fontSize="inherit" />}
             color="#ff9800"
           />
           <StatCard
-            title="Responded"
-            value={stats?.responded}
+            title="Successful"
+            value={stats.successful}
             icon={<MailCheck fontSize="inherit" />}
             color="#4caf50"
           />
           <StatCard
             title="Failed"
-            value={stats?.failed}
+            value={stats.failed}
             icon={<MailWarning fontSize="inherit" />}
             color="#f44336"
           />
