@@ -13,7 +13,7 @@ app.get("/healthz", (_, res) => {
   res.send("Server is healthy");
 });
 
-ViteExpress.listen(app, 3000, () => {
+ViteExpress.listen(app, Number.parseInt(process.env.PORT ?? "3000", 10), () => {
   console.log("Server is listening on port 3000...");
   QueuingService.start();
 });
