@@ -48,7 +48,7 @@ export default function Table({
               </p>
               <p className="py-3 px-6 border-r border-zinc-300 truncate">
                 <a
-                  href={`https://${item.domain}`}
+                  href={item.domain}
                   target="_blank"
                   rel="noreferrer"
                   className="text-blue-600 hover:underline"
