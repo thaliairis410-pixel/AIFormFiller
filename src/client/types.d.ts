@@ -7,7 +7,7 @@ export interface StatCardProps {
 
 export type QueueItem = {
   id: string;
-  status: "SUCCESS" | "FAILED" | "PENDING";
+  status: "SUCCESS" | "FAILED" | "PENDING" | "IN_PROGRESS";
   domain: string;
   failureReason?: string;
   createdAt: string;
