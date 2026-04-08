@@ -6,7 +6,7 @@ export default class BrowserService {
   private static async launchBrowser() {
     if (!BrowserService.browser?.connected) {
       BrowserService.browser = await puppeteer.launch({
-        headless: "shell",
+        headless: true,
         args: [
           "--no-sandbox",
           "--disable-setuid-sandbox",
