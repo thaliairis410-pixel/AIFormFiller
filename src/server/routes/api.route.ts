@@ -7,5 +7,6 @@ router.post("/upload", ApiController.handleUpload);
 router.post("/status", ApiController.getSubmissionStatus);
 router.get("/status", ApiController.getSubmissionStatus);
 router.get("/stats", ApiController.getStats);
+router.get("/default-values", ApiController.getDefaultFormValues);
 
 export default router;

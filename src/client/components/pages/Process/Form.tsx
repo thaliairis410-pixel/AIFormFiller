@@ -1,5 +1,6 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
+import getFormDefaultValues from "../../../utils/get-form-default-values";
 import upload from "../../../utils/upload";
 
 export default function Form({
@@ -7,22 +8,17 @@ export default function Form({
 }: {
   setDomains: React.Dispatch<React.SetStateAction<string[] | undefined>>;
 }) {
-  const defaultValues = {
-    fullName: "John Doe",
-    email: "johndoe@example.com",
-    phoneNumber: "+123456789",
-    companyName: "Acme Corporation",
-    position: "Software Engineer",
-    address: "123 Main Street, New York, NY 10001",
-    message: "Hello, I would like to get in touch regarding your services.",
-  };
+  const [defaultValues, setDefaultValues] = useState<Record<string, string>>(
+    {},
+  );
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const {
     register,
     formState: { errors },
     handleSubmit,
-  } = useForm({ mode: "onBlur", defaultValues });
+    setValue,
+  } = useForm({ mode: "onBlur" });
 
   const errorClassName = "bg-red-50 border-red-300 outline-red-500";
   const validClassName = "border-zinc-300 bg-transparent";
@@ -35,6 +31,18 @@ export default function Form({
     [setDomains],
   );
 
+  useEffect(() => {
+    getFormDefaultValues().then((data) =>
+      setDefaultValues(data as Record<string, string>),
+    );
+  }, []);
+
+  useEffect(() => {
+    for (const key in defaultValues) {
+      setValue(key, defaultValues[key]);
+    }
+  }, [defaultValues, setValue]);
+
   return (
     <div className="bg-white border border-zinc-300 p-6 rounded-xl h-fit md:sticky top-38">
       <form
@@ -45,6 +53,8 @@ export default function Form({
         })}
         className="space-y-3"
       >
+        <input type="hidden" value={defaultValues.id} name="id" />
+
         {/* File upload */}
         <div className="bg-zinc-100 border border-dashed rounded-xl border-zinc-300 p-6 text-center text-sm text-zinc-600">
           <div>Drag & drop CSV/TXT file</div>
@@ -71,7 +81,7 @@ export default function Form({
             Full Name<sup className="text-red-400">*</sup>
           </label>
           <input
-            {...register("fullName", {
+            {...register("name", {
               required: { value: true, message: "Enter your full name" },
               pattern: {
                 value: /^[a-zA-Z\-']+(\s[a-zA-Z\-']+)*$/,
@@ -122,13 +132,13 @@ export default function Form({
             Phone Number<sup className="text-red-400">*</sup>
           </label>
           <input
-            {...register("phoneNumber", {
+            {...register("phone", {
               required: {
                 value: true,
                 message: "Enter your phone number",
               },
               pattern: {
-                value: /^\+?[0-9]{5,}$/,
+                value: /^\+?[\s0-9-]{5,}$/,
                 message: "Enter a valid phone number",
               },
             })}
@@ -194,6 +204,116 @@ export default function Form({
             {errors.position && (
               <div className="text-red-400 text-xs">
                 {errors.position.message as string}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Country + City */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="flex flex-col text-sm gap-1">
+            <label htmlFor="country">
+              Country<sup className="text-red-400">*</sup>
+            </label>
+            <input
+              {...register("country", {
+                required: {
+                  value: true,
+                  message: "Enter your country",
+                },
+                pattern: {
+                  value: /^[a-zA-Z\-']+(\s[a-zA-Z\-']+)*$/,
+                  message:
+                    "Names can only contain letters and/or -, ' characters",
+                },
+              })}
+              type="text"
+              id="country"
+              placeholder="United States of America"
+              className={`${errors.country ? errorClassName : validClassName} p-3 border rounded-xl capitalize`}
+            />
+            {errors.country && (
+              <div className="text-red-400 text-xs">
+                {errors.country?.message as string}
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-col text-sm gap-1">
+            <label htmlFor="position">
+              City<sup className="text-red-400">*</sup>
+            </label>
+            <input
+              {...register("city", {
+                required: { value: true, message: "Enter your city" },
+                pattern: {
+                  value: /^[a-zA-Z\-']+(\s[a-zA-Z\-']+)*$/,
+                  message: "Only letters and/or -, ' are allowed",
+                },
+              })}
+              type="text"
+              id="city"
+              placeholder="Chicago"
+              className={`${errors.city ? errorClassName : validClassName} p-3 border rounded-xl capitalize`}
+            />
+            {errors.city && (
+              <div className="text-red-400 text-xs">
+                {errors.city.message as string}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Town + Postal code */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="flex flex-col text-sm gap-1">
+            <label htmlFor="country">
+              Town<sup className="text-red-400">*</sup>
+            </label>
+            <input
+              {...register("town", {
+                required: {
+                  value: true,
+                  message: "Enter your town",
+                },
+                pattern: {
+                  value: /^[a-zA-Z\-']+(\s[a-zA-Z\-']+)*$/,
+                  message:
+                    "Names can only contain letters and/or -, ' characters",
+                },
+              })}
+              type="text"
+              id="town"
+              placeholder="Your call"
+              className={`${errors.town ? errorClassName : validClassName} p-3 border rounded-xl capitalize`}
+            />
+            {errors.town && (
+              <div className="text-red-400 text-xs">
+                {errors.town?.message as string}
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-col text-sm gap-1">
+            <label htmlFor="position">
+              Postal Code<sup className="text-red-400">*</sup>
+            </label>
+            <input
+              {...register("postalCode", {
+                required: { value: true, message: "Enter your postal code" },
+                pattern: {
+                  value: /^[\d]+$/,
+                  message: "Only numbers are allowed",
+                },
+              })}
+              type="text"
+              id="city"
+              placeholder="900111"
+              className={`${errors.postalCode ? errorClassName : validClassName} p-3 border rounded-xl capitalize`}
+            />
+            {errors.postalCode && (
+              <div className="text-red-400 text-xs">
+                {errors.postalCode.message as string}
               </div>
             )}
           </div>

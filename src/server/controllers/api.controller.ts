@@ -30,4 +30,8 @@ export default class ApiController {
   static async getStats(_: Request, res: Response) {
     res.json(await ApiService.getStats());
   }
+
+  static async getDefaultFormValues(_: Request, res: Response) {
+    res.json(await ApiService.getDefaultFormValues());
+  }
 }

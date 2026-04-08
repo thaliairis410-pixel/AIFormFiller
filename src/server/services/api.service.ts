@@ -4,6 +4,7 @@ import type formidable from "formidable";
 import {
   type Submission,
   SubmissionStatus,
+  type SystemConfig,
 } from "../../../generated/prisma/client.js";
 import prisma from "../utils/prisma.util.js";
 import processDomains from "../utils/process-domains.util.js";
@@ -14,9 +15,9 @@ export default class ApiService {
     fields: formidable.Fields,
   ) {
     try {
-      const parsedFields = {} as Record<string, string>;
+      const parsedFields = {} as Partial<SystemConfig>;
       Object.keys(fields).forEach((key) => {
-        parsedFields[key] = fields[key]?.[0] || "";
+        parsedFields[key as keyof SystemConfig] = fields[key]?.[0] || "";
       });
 
       const parsedFiles = Object.values(files).flat();
@@ -32,12 +33,21 @@ export default class ApiService {
         ).flat();
       }
 
-      await prisma.submission.createMany({
-        data: domains.map((domain) => ({
-          status: "PENDING",
-          domain,
-        })),
-      });
+      const { id } = parsedFields;
+      delete parsedFields.id;
+
+      await Promise.all([
+        prisma.systemConfig.update({
+          where: { id },
+          data: parsedFields,
+        }),
+        prisma.submission.createMany({
+          data: domains.map((domain) => ({
+            status: "PENDING",
+            domain,
+          })),
+        }),
+      ]);
 
       return { success: true, data: { domains, fields: parsedFields } };
     } catch (error) {
@@ -168,6 +178,29 @@ export default class ApiService {
           `failed_stats-${new Date().toDateString()}.txt`,
         ),
         `Failed to fetch stats at ${new Date().toISOString()}\n${error}`,
+        "utf-8",
+      );
+
+      return { success: false, error: "Failed to fetch stats" };
+    }
+  }
+
+  static async getDefaultFormValues() {
+    try {
+      const data = await prisma.systemConfig.findFirst();
+
+      return {
+        success: true,
+        data,
+      };
+    } catch (error) {
+      await appendFile(
+        join(
+          process.cwd(),
+          "logs",
+          `failed_sys_config_fetch-${new Date().toDateString()}.txt`,
+        ),
+        `Failed to fetch system config values at ${new Date().toISOString()}\n${error}`,
         "utf-8",
       );
 
