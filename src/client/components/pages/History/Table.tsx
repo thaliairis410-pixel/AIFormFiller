@@ -17,7 +17,7 @@ export default function Table({
 
   return (
     <div className="bg-white border border-zinc-300 rounded-2xl overflow-auto">
-      <div className="grid grid-cols-[1fr_2fr_1fr_1fr_2fr] border-b border-zinc-300 font-semibold text-sm min-w-[700px]">
+      <div className="grid grid-cols-[minmax(100px,1fr)_minmax(100px,2fr)_minmax(100px,1fr)_minmax(100px,1fr)_minmax(100px,2fr)] border-b border-zinc-300 font-semibold text-sm min-w-175">
         <p className="py-3 px-6 border-r border-zinc-300">ID</p>
         <p className="py-3 px-6 border-r border-zinc-300">Domain</p>
         <p className="py-3 px-6 border-r border-zinc-300">Status</p>
@@ -25,7 +25,7 @@ export default function Table({
         <p className="py-3 px-6">Failure Reason</p>
       </div>
 
-      <div className="min-w-[700px]">
+      <div className="min-w-175">
         {loading ? (
           <div className="flex items-center justify-center py-20 gap-3">
             <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
@@ -41,7 +41,7 @@ export default function Table({
           queue.map((item) => (
             <div
               key={item.id}
-              className="grid grid-cols-[1fr_2fr_1fr_1fr_2fr] odd:bg-zinc-50 not-last-of-type:border-b border-zinc-300 hover:bg-zinc-100 transition text-sm"
+              className="grid grid-cols-[minmax(100px,1fr)_minmax(100px,2fr)_minmax(100px,1fr)_minmax(100px,1fr)_minmax(100px,2fr)] odd:bg-zinc-50 not-last-of-type:border-b border-zinc-300 hover:bg-zinc-100 transition text-sm"
             >
               <p className="py-3 px-6 border-r border-zinc-300 font-mono text-zinc-400 truncate">
                 {item.id}

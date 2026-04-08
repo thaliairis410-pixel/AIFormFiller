@@ -1,13 +1,11 @@
-import path from "node:path";
-import puppeteer, { type Browser, type Page } from "puppeteer-core";
+import puppeteer, { type Browser, type Page } from "puppeteer";
 
 export default class BrowserService {
   private static browser: Browser | null = null;
 
   private static async launchBrowser() {
-    if (!BrowserService.browser?.isConnected()) {
+    if (!BrowserService.browser?.connected) {
       BrowserService.browser = await puppeteer.launch({
-        executablePath: path.resolve(process.cwd(), "./brave.exe"),
         headless: true,
         args: [
           "--no-sandbox",

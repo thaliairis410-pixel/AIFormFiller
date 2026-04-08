@@ -1,4 +1,4 @@
-import type { HTTPResponse, Page } from "puppeteer-core";
+import type { HTTPResponse, Page } from "puppeteer";
 import minify from "../utils/minify.util.js";
 import purify from "../utils/purify.util.js";
 import AI from "./ai.service.js";

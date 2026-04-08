@@ -48,7 +48,6 @@ export default function History() {
           </div>
         </div>
 
-        {/* Table */}
         <Table loading={loading} error={error || ""} />
 
         {!loading && !error && totalPages > 1 && (

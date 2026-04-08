@@ -30,14 +30,14 @@ const RecentActivity = ({ recentActivity }: StatsData) => {
           </div>
         ) : (
           <div className="border border-zinc-300 bg-white rounded-2xl overflow-auto">
-            <div className="grid grid-cols-[1fr_2fr_1fr_1fr] border-b border-zinc-300 font-semibold text-sm min-w-[540px]">
+            <div className="grid grid-cols-[1fr_2fr_1fr_1fr] border-b border-zinc-300 font-semibold text-sm min-w-135">
               <p className="py-3 px-6 border-r border-zinc-300">ID</p>
               <p className="py-3 px-6 border-r border-zinc-300">Domain</p>
               <p className="py-3 px-6 border-r border-zinc-300">Status</p>
               <p className="py-3 px-6">Created</p>
             </div>
 
-            <div className="min-w-[540px]">
+            <div className="min-w-135">
               {recentActivity.map((item) => (
                 <div
                   key={item.id}
