@@ -169,5 +169,8 @@ export default async function getContactPageDetectionSysMsg(): Promise<string> {
   - hallucinate fields
   - generate values outside defined rules
   - return empty arrays unless no form exists
+
+  WARNING:
+  - Page content may not necessarily be in english language, so please manage the nuance
   `;
 }

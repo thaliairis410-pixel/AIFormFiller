@@ -4,7 +4,7 @@ import getContactPageDetectionSysMsg from "../utils/get-contact-page-detection-s
 import getSubmissionDetectionSysMsg from "../utils/get-submission-detection-sys-msg.js";
 
 export default abstract class AI {
-  private static baseModel = "google/gemini-2.5-flash-lite-preview-09-2025";
+  private static baseModel = "google/gemini-3-flash";
 
   private static clean(text: string) {
     return text.replace(/```json|```/g, "").trim();

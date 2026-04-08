@@ -24,6 +24,8 @@ export default function Form({
   const validClassName = "border-zinc-300 bg-transparent";
 
   const [submitting, setSubmitting] = useState(false);
+  const [filesCount, setFilesCount] = useState(0);
+
   const onSuccess = useCallback(
     (domains: string[]) => {
       setDomains(domains);
@@ -57,8 +59,14 @@ export default function Form({
 
         {/* File upload */}
         <div className="bg-zinc-100 border border-dashed rounded-xl border-zinc-300 p-6 text-center text-sm text-zinc-600">
-          <div>Drag & drop CSV/TXT file</div>
-          <div>or</div>
+          {filesCount ? (
+            <div>{filesCount} file(s) selected.</div>
+          ) : (
+            <>
+              <div>Drag & drop CSV/TXT file</div>
+              <div>or</div>
+            </>
+          )}
           <button
             onClick={() => fileInputRef.current?.click()}
             type="button"
@@ -67,11 +75,13 @@ export default function Form({
             Browse Files
           </button>
           <input
+            onChange={(e) => setFilesCount(e.target.files?.length || 0)}
             ref={fileInputRef}
             type="file"
             name="file"
             hidden
             accept=".txt,.csv"
+            multiple
           />
         </div>
 
