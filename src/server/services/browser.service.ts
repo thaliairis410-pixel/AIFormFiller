@@ -49,7 +49,6 @@ export default class BrowserService {
       });
 
       await BrowserService.safeGoto(page, url);
-      await page.waitForNetworkIdle().catch(() => null);
 
       return page;
     } catch (err) {
