@@ -16,7 +16,7 @@ export class QueuingService {
     // Seed the queue before spawning workers
     await QueuingService.refill();
 
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 5; i++) {
       const workerPath = import.meta.resolve("../utils/worker.util.js");
       const worker = new Worker(
         `import('tsx/esm/api').then(({ register }) => { register(); import('${workerPath}'); })`,
