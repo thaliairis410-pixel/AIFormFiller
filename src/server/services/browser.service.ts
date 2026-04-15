@@ -6,7 +6,7 @@ export default class BrowserService {
   private static async launchBrowser() {
     if (!BrowserService.browser?.connected) {
       BrowserService.browser = await puppeteer.launch({
-        headless: "shell",
+        headless: true,
         args: [
           "--no-sandbox",
           "--disable-setuid-sandbox",
@@ -16,15 +16,6 @@ export default class BrowserService {
     }
 
     return BrowserService.browser;
-  }
-
-  private static async closeBrowser() {
-    if (BrowserService.browser) {
-      try {
-        await BrowserService.browser.close();
-      } catch {}
-      BrowserService.browser = null;
-    }
   }
 
   static async launchPage(url: string) {
@@ -57,10 +48,22 @@ export default class BrowserService {
     }
   }
 
+  private static isPermanentError(message: string): boolean {
+    const permanentErrors = [
+      "net::ERR_NAME_NOT_RESOLVED",
+      "net::ERR_ADDRESS_UNREACHABLE",
+      "net::ERR_INVALID_URL",
+      "net::ERR_UNKNOWN_URL_SCHEME",
+    ];
+
+    return permanentErrors.some((err) => message.includes(err));
+  }
+
   private static async safeGoto(
     page: Page,
     url: string,
     retries = 2,
+    delayMs = 1000,
   ): Promise<void> {
     try {
       await page.goto(url, {
@@ -68,11 +71,26 @@ export default class BrowserService {
         timeout: 60000,
       });
     } catch (err) {
-      // Retry on error
-      if (retries > 0) {
-        return await BrowserService.safeGoto(page, url, retries - 1);
+      const error = err as Error;
+      const errorMsg = error.message;
+
+      // Check for permanent failures
+      if (BrowserService.isPermanentError(errorMsg)) {
+        throw new Error(`Network error (permanent): ${errorMsg}`);
       }
-      throw err;
+
+      // Retry logic for temporary failures
+      if (retries > 0) {
+        await new Promise((r) => setTimeout(r, delayMs));
+        return await BrowserService.safeGoto(
+          page,
+          url,
+          retries - 1,
+          Math.min(delayMs * 1.5, 10000), // Exponential backoff, max 10s
+        );
+      }
+
+      throw new Error(`Navigation failed after retries: ${errorMsg}`);
     }
   }
 

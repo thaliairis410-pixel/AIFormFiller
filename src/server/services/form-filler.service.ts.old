@@ -1,0 +1,370 @@
+import type { HTTPResponse, Page } from "puppeteer";
+import minify from "../utils/minify.util.js";
+import purify from "../utils/purify.util.js";
+import AI from "./ai.service.js";
+import BrowserService from "./browser.service.js";
+
+const MAX_DEPTH = 3;
+const SPA_SETTLE_DELAY = 30_000; // ✅ FIXED: Was 5000, too short for SPAs
+
+interface FillResult {
+  success: boolean;
+  reason?: string;
+  note?: string;
+  protection?: Record<string, boolean>;
+}
+
+interface ContactPageData {
+  blocked?: boolean;
+  found?: boolean;
+  foundContactFormOnPage?: boolean;
+  path?: string;
+  formSelector?: string;
+  fields?: { selector: string; name?: string; value: string; type: string }[];
+  protection?: Record<string, boolean>;
+}
+
+export default class FormFiller {
+  /* ---------------- SNAPSHOT ---------------- */
+  private static async getPageSnapshot(page: Page): Promise<string> {
+    const html = await BrowserService.getPageHtml(page);
+    const clean = await purify(html);
+    const minified = await minify(clean);
+    return minified;
+  }
+
+  private static async analyzeContactPage(
+    page: Page,
+  ): Promise<ContactPageData> {
+    const snapshot = await FormFiller.getPageSnapshot(page);
+    const raw = await AI.findContactPageUrl(page.url(), snapshot);
+
+    try {
+      return JSON.parse(raw) as ContactPageData;
+    } catch {
+      throw new Error(
+        `AI returned non-JSON response: ${raw.substring(0, 200)}`,
+      );
+    }
+  }
+
+  private static async analyzeSubmissionResult(
+    page: Page,
+  ): Promise<{ success: boolean; reason?: string }> {
+    const text = await page.evaluate(() => document.body.innerText);
+
+    const raw = await AI.detectFormSubmissionResult({
+      text: text.substring(0, 140_000),
+      url: page.url(),
+    });
+
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return { success: false };
+    }
+  }
+
+  private static async waitForHydration(page: Page) {
+    // Wait for form elements to appear
+    await page.waitForFunction(
+      () => {
+        return document.querySelectorAll("input, textarea, select").length > 0;
+      },
+      { timeout: 15000 },
+    );
+
+    // Wait for network to settle
+    try {
+      await page.waitForNetworkIdle({ idleTime: 1000, timeout: 10000 });
+    } catch {}
+
+    // ✅ FIXED: Extra wait for React/Vue hydration
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+
+  /**
+   * ✅ FIXED: Now returns boolean to indicate success
+   * Removed silent failures
+   */
+  private static async fillField(
+    page: Page,
+    field: Required<ContactPageData>["fields"][number],
+  ): Promise<boolean> {
+    const selector = field.selector || `[name="${field.name}"]`;
+
+    const exists = await page.$(selector).catch(() => null);
+    if (!exists) {
+      console.warn(`⚠️ Field not found: ${selector}`);
+      return false; // ✅ FIXED: Was return, now returns false
+    }
+
+    try {
+      if (field.type === "checkbox" || field.type === "radio") {
+        await page.click(selector).catch(() => {});
+        return true;
+      }
+
+      // ✅ FIXED: Better React/Framework compatibility
+      // Instead of using the value setter directly, use keyboard input
+      // which triggers all framework listeners naturally
+      await page.evaluate((selector) => {
+        const el = document.querySelector(selector) as HTMLInputElement;
+        if (!el) return;
+        el.focus();
+      }, selector);
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Clear the field
+      await page.evaluate((selector) => {
+        const el = document.querySelector(selector) as HTMLInputElement;
+        if (!el) return;
+        el.value = ""; // Clear first
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+      }, selector);
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // Type the value using keyboard (works with React)
+      await page.keyboard.type(field.value, { delay: 10 });
+
+      // Dispatch final events
+      await page.evaluate((selector) => {
+        const el = document.querySelector(selector) as HTMLInputElement;
+        if (!el) return;
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+        el.dispatchEvent(new Event("change", { bubbles: true }));
+        el.dispatchEvent(new Event("blur", { bubbles: true }));
+      }, selector);
+
+      return true; // ✅ FIXED: Indicate success
+    } catch (err) {
+      console.warn(
+        `⚠️ Error filling field ${selector}: ${(err as Error).message}`,
+      );
+      return false;
+    }
+  }
+
+  /**
+   * ✅ FIXED: Better submission detection with return value
+   */
+  private static async submitForm(
+    page: Page,
+    formSelector: string,
+  ): Promise<{ submitted: boolean; confirmed: boolean }> {
+    const form = await page
+      .waitForSelector(formSelector, { timeout: 5000 })
+      .catch(() => null);
+
+    if (!form) return { submitted: false, confirmed: false };
+
+    let successResponse = false;
+    let navigationOccurred = false;
+
+    // ✅ FIXED: Removed async from response handler
+    const onResponse = (res: HTTPResponse) => {
+      try {
+        const req = res.request();
+
+        if (!["POST", "PUT", "PATCH"].includes(req.method())) return;
+
+        // ✅ FIXED: Better hostname matching
+        const reqUrl = new URL(res.url());
+        const pageUrl = new URL(page.url());
+
+        const isSameDomain =
+          reqUrl.hostname === pageUrl.hostname ||
+          reqUrl.hostname.endsWith(`.${pageUrl.hostname}`);
+
+        if (!isSameDomain) return;
+
+        const status = res.status();
+
+        if (status >= 200 && status < 300) {
+          successResponse = true;
+          console.log(`✓ Form submission response: ${status}`);
+        }
+      } catch {}
+    };
+
+    page.on("response", onResponse);
+
+    try {
+      // Click submit button or use requestSubmit
+      await page.evaluate((selector) => {
+        const form = document.querySelector(selector) as HTMLFormElement | null;
+        if (!form) return;
+
+        const btn = form.querySelector(
+          "button[type='submit'], input[type='submit']",
+        ) as HTMLElement | null;
+
+        if (btn) btn.click();
+        else if (form.requestSubmit) form.requestSubmit();
+      }, formSelector);
+
+      console.log("📤 Form submitted, waiting for response...");
+
+      // ✅ FIXED: Better race condition handling
+      // Wait for either navigation or successful response
+      await Promise.race([
+        page
+          .waitForNavigation({ waitUntil: "domcontentloaded", timeout: 8000 })
+          .then(() => {
+            navigationOccurred = true;
+          })
+          .catch(() => {}),
+        page
+          .waitForFunction(() => successResponse, { timeout: 8000 })
+          .catch(() => {}),
+        new Promise((r) => setTimeout(r, 3000)), // Min 3 second wait
+      ]);
+    } catch (err) {
+      console.warn(`⚠️ Error submitting form: ${(err as Error).message}`);
+    }
+
+    page.off("response", onResponse);
+
+    return {
+      submitted: navigationOccurred || successResponse,
+      confirmed: successResponse, // Only true if we saw 2xx response
+    };
+  }
+
+  private static async fillForm(
+    page: Page,
+    data: ContactPageData,
+  ): Promise<FillResult> {
+    if (!data.formSelector) {
+      return { success: false, reason: "Form selector missing in AI response" };
+    }
+
+    if (!data.fields?.length) {
+      return { success: false, reason: "No fields provided by AI" };
+    }
+
+    console.log(`\n📝 Filling form with ${data.fields.length} fields...`);
+
+    await FormFiller.waitForHydration(page);
+
+    // ✅ FIXED: Track which fields were filled
+    const fillResults = await Promise.all(
+      data.fields.map((field) => FormFiller.fillField(page, field)),
+    );
+
+    const filledCount = fillResults.filter(Boolean).length;
+    console.log(`✓ Filled ${filledCount}/${data.fields.length} fields`);
+
+    // ✅ FIXED: Fail if no fields were filled
+    if (filledCount === 0) {
+      return {
+        success: false,
+        reason: "Could not fill any form fields",
+      };
+    }
+
+    // Try to submit
+    console.log("\n🚀 Submitting form...");
+    const { submitted, confirmed } = await FormFiller.submitForm(
+      page,
+      data.formSelector,
+    );
+
+    if (confirmed) {
+      return {
+        success: true,
+        reason: "Confirmed via network (2xx response)",
+      };
+    }
+
+    // ✅ FIXED: Better fallback logic
+    if (!submitted) {
+      console.log("⚠️ No submission signal detected, running AI analysis...");
+    }
+
+    // Wait for SPA processing
+    await new Promise((r) => setTimeout(r, SPA_SETTLE_DELAY));
+
+    const result = await FormFiller.analyzeSubmissionResult(page);
+    if (result.success) {
+      return {
+        success: true,
+        note: result.reason || "AI detected probable success",
+      };
+    }
+
+    return {
+      success: false,
+      reason: result.reason || "Form submission failed",
+    };
+  }
+
+  static async findAndFill(url: string, depth = 0): Promise<FillResult> {
+    if (depth > MAX_DEPTH) {
+      return {
+        success: false,
+        reason: `Max navigation depth (${MAX_DEPTH}) exceeded`,
+      };
+    }
+
+    const page = await BrowserService.launchPage(url);
+    let data: ContactPageData;
+
+    try {
+      console.log(`\n${"=".repeat(60)}`);
+      console.log(`📍 Processing: ${url} (depth: ${depth})`);
+      console.log(`${"=".repeat(60)}`);
+
+      data = await FormFiller.analyzeContactPage(page);
+    } catch (err) {
+      console.error("Error:", err);
+      await BrowserService.closePage(page);
+      return { success: false, reason: (err as Error).message };
+    }
+
+    if (data.blocked) {
+      await BrowserService.closePage(page);
+      return { success: false, reason: "Blocked by anti-bot protection" };
+    }
+
+    if (!data.found) {
+      await BrowserService.closePage(page);
+      return { success: false, reason: "No contact page found" };
+    }
+
+    console.log("✓ Contact page found");
+
+    if (data.foundContactFormOnPage) {
+      console.log("✓ Contact form found on this page");
+      const result = await FormFiller.fillForm(page, data);
+      await BrowserService.closePage(page);
+      return result;
+    }
+
+    if (!data.path) {
+      await BrowserService.closePage(page);
+      return {
+        success: false,
+        reason: "Contact page detected but no form available",
+      };
+    }
+
+    let nextUrl: string;
+
+    try {
+      nextUrl = new URL(data.path, page.url()).toString();
+    } catch {
+      await BrowserService.closePage(page);
+      return {
+        success: false,
+        reason: `Invalid path returned by AI: ${data.path}`,
+      };
+    }
+
+    console.log(`→ Navigating to contact form at: ${nextUrl}`);
+    await BrowserService.closePage(page);
+    return FormFiller.findAndFill(nextUrl, depth + 1);
+  }
+}

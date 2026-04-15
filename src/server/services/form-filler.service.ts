@@ -5,14 +5,13 @@ import AI from "./ai.service.js";
 import BrowserService from "./browser.service.js";
 
 const MAX_DEPTH = 3;
-const SPA_SETTLE_DELAY = 30_000;
-const MAX_HTML_LENGTH = 140_000;
+const SPA_SETTLE_DELAY = 5000;
 
-interface FillResult {
-  success: boolean;
-  reason?: string;
-  note?: string;
-  protection?: Record<string, boolean>;
+interface ContactField {
+  selector: string;
+  name?: string;
+  value: string;
+  type: string;
 }
 
 interface ContactPageData {
@@ -21,18 +20,20 @@ interface ContactPageData {
   foundContactFormOnPage?: boolean;
   path?: string;
   formSelector?: string;
-  fields?: { selector: string; name?: string; value: string; type: string }[];
-  protection?: Record<string, boolean>;
+  fields?: ContactField[];
+}
+
+interface FillResult {
+  success: boolean;
+  reason?: string;
+  note?: string;
 }
 
 export default class FormFiller {
   private static async getPageSnapshot(page: Page): Promise<string> {
     const html = await BrowserService.getPageHtml(page);
     const clean = await purify(html);
-    const minified = await minify(clean);
-    return minified.length > MAX_HTML_LENGTH
-      ? minified.substring(0, MAX_HTML_LENGTH)
-      : minified;
+    return await minify(clean);
   }
 
   private static async analyzeContactPage(
@@ -40,285 +41,224 @@ export default class FormFiller {
   ): Promise<ContactPageData> {
     const snapshot = await FormFiller.getPageSnapshot(page);
     const raw = await AI.findContactPageUrl(page.url(), snapshot);
-
     try {
       return JSON.parse(raw) as ContactPageData;
     } catch {
-      throw new Error(
-        `AI returned non-JSON response: ${raw.substring(0, 200)}`,
-      );
+      throw new Error("AI returned invalid JSON structure.");
     }
   }
 
-  private static async analyzeSubmissionResult(
-    page: Page,
-  ): Promise<{ success: boolean; reason?: string }> {
-    const text = await page.evaluate(() => document.body.innerText);
+  /**
+   * Fills a specific field.
+   * We pass primitive strings to evaluate to prevent transpiler mangling errors.
+   */
+  private static async fillField(page: Page, field: ContactField) {
+    // Resolve selector: if AI provided a selector use it, otherwise fallback to name attribute
+    const cssSelector = field.selector || `[name="${field.name}"]`;
+    const targetValue = field.value;
+    const fieldType = field.type;
 
-    const raw = await AI.detectFormSubmissionResult({
-      text: text.substring(0, 140_000),
-      url: page.url(),
-    });
+    const exists = await page
+      .waitForSelector(cssSelector, { timeout: 3000 })
+      .catch(() => null);
 
-    try {
-      return JSON.parse(raw);
-    } catch {
-      return {
-        success: true,
-        reason: "AI response unparsable — assumed success",
-      };
+    if (!exists) {
+      return;
     }
+
+    if (fieldType === "checkbox") {
+      await exists.evaluate((_el) => {
+        const el = _el as HTMLInputElement;
+
+        if (el.checked) {
+          return;
+        }
+
+        el.checked = true;
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+        el.dispatchEvent(new Event("change", { bubbles: true }));
+        el.dispatchEvent(new Event("blur", { bubbles: true }));
+      });
+    }
+
+    if (fieldType === "radio") {
+      await exists.click().catch(() => {});
+      return;
+    }
+
+    // React/Vue-safe value injection
+    await page.evaluate(
+      (sel, val) => {
+        const el = document.querySelector(sel) as HTMLInputElement | null;
+        if (!el) {
+          return;
+        }
+
+        el.value = val;
+        // Trigger events so the site knows the data changed
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+        el.dispatchEvent(new Event("change", { bubbles: true }));
+        el.dispatchEvent(new Event("blur", { bubbles: true }));
+      },
+      cssSelector,
+      targetValue,
+    );
   }
 
-  private static async fillField(
-    page: Page,
-    field: Required<ContactPageData>["fields"][number],
-  ) {
-    const input =
-      (await page.$(field.selector).catch(() => null)) ||
-      (await page.$(`[name="${field.name}"]`).catch(() => null));
-
-    if (!input) {
-      return;
-    }
-
-    if (field.type === "checkbox") {
-      await input.click({ delay: 100 });
-      return;
-    }
-
-    if (field.type === "radio") {
-      await input.click({ delay: 100 });
-      return;
-    }
-
-    await input.click({ count: 3 });
-    await input.press("Backspace");
-    await input.type(field.value, { delay: 100 });
-  }
-
+  /**
+   * Submits the form and monitors for network success (2xx POST/PUT)
+   */
   private static async submitForm(
     page: Page,
     formSelector: string,
   ): Promise<boolean> {
-    const form = await page
-      .waitForSelector(formSelector, {
-        timeout: 5000,
-      })
-      .catch(() => null);
-
-    if (!form) return false;
-
-    const submitButton =
-      (await form
-        .$("button[type='submit'], input[type='submit'], button:not([type])")
-        .catch(() => null)) || null;
-
-    let networkSignal = false;
-    let relevantResponse: HTTPResponse | null = null;
+    let isSuccess = false;
 
     const onResponse = (res: HTTPResponse) => {
-      const req = res.request();
-
-      const isFormLike =
-        ["POST", "PUT", "PATCH"].includes(req.method()) &&
-        req.url().includes(new URL(page.url()).hostname);
-
-      if (isFormLike) {
-        networkSignal = true;
-        relevantResponse = res;
+      const method = res.request().method();
+      if (["POST", "PUT", "PATCH"].includes(method)) {
+        if (res.status() >= 200 && res.status() < 300) {
+          isSuccess = true;
+        }
       }
     };
 
     page.on("response", onResponse);
 
-    const navigationPromise = page
-      .waitForNavigation({
-        waitUntil: "domcontentloaded",
-        timeout: 10_000,
-      })
-      .then(() => true)
-      .catch(() => false);
-
-    const domChangePromise = page
-      .waitForFunction(
-        () => {
-          const text = document.body.innerText.toLowerCase();
-          const success = /thank|success|sent|received|submitted/.test(text);
-          const failure = /error|failed|invalid|required/.test(text);
-          const successNode = document.querySelector(
-            "[class*='success'],[id*='success'],[class*='thank'],[id*='thank']",
-          );
-
-          return success || successNode || failure;
-        },
-        { timeout: 10_000 },
-      )
-      .then(() => true)
-      .catch(() => false);
-
-    const networkWaitPromise = page
-      .waitForResponse(
-        (res) => {
-          const req = res.request();
-          return (
-            ["POST", "PUT", "PATCH"].includes(req.method()) &&
-            res.url().includes(new URL(page.url()).hostname)
-          );
-        },
-        { timeout: 10_000 },
-      )
-      .then(() => true)
-      .catch(() => false);
-
     try {
-      if (submitButton) {
-        await Promise.allSettled([submitButton.click({ delay: 50 })]);
-      } else {
-        console.log("submitButton not found, submitting form via evaluate");
-        await form.evaluate((el: any) => {
-          if (typeof el.requestSubmit === "function") {
-            el.requestSubmit();
-          } else {
-            el.dispatchEvent(
-              new Event("submit", { bubbles: true, cancelable: true }),
-            );
+      await Promise.all([
+        page.evaluate((sel) => {
+          const f = document.querySelector(sel) as HTMLFormElement | null;
+          if (!f) {
+            return;
           }
-        });
-      }
-    } catch {}
 
-    const [nav, dom, net] = await Promise.allSettled([
-      navigationPromise,
-      domChangePromise,
-      networkWaitPromise,
-    ]);
+          const btn = f.querySelector(
+            "button[type='submit'], input[type='submit'], .submit-btn",
+          ) as HTMLElement | null;
 
-    page.off("response", onResponse);
+          if (btn) {
+            btn.click();
+          } else {
+            f.requestSubmit?.();
+          }
+        }, formSelector),
 
-    const navSuccess = nav.status === "fulfilled" && nav.value;
-    const domSuccess = dom.status === "fulfilled" && dom.value;
-    const netSuccess = net.status === "fulfilled" && net.value;
+        // Wait for a response or a page navigation as signs of submission
+        page
+          .waitForResponse(
+            (res) => ["POST", "PUT", "PATCH"].includes(res.request().method()),
+            { timeout: 10000 },
+          )
+          .catch(() => null),
 
-    if (netSuccess || networkSignal) {
-      if (relevantResponse) {
-        const status = (relevantResponse as HTTPResponse).status();
-        if (status >= 200 && status < 500) {
-          return true;
-        }
-      }
-
-      return true;
+        page
+          .waitForNavigation({ waitUntil: "networkidle2", timeout: 8000 })
+          .catch(() => null),
+      ]);
+    } catch {
+    } finally {
+      page.off("response", onResponse);
     }
 
-    if (domSuccess) return true;
-    if (navSuccess) return true;
-
-    await new Promise((r) => setTimeout(r, 3000));
-    return false;
+    return isSuccess;
   }
 
   private static async fillForm(
     page: Page,
     data: ContactPageData,
   ): Promise<FillResult> {
-    if (!data.formSelector) {
-      return { success: false, reason: "Form selector missing in AI response" };
+    if (!data.formSelector || !data.fields?.length) {
+      return { success: false, reason: "Form data missing" };
     }
 
-    if (!data.fields?.length) {
-      return { success: false, reason: "No fields provided by AI" };
-    }
+    // Wait for inputs to be present
+    await page
+      .waitForFunction(
+        () => document.querySelectorAll("input, textarea, select").length > 0,
+        { timeout: 10000 },
+      )
+      .catch(() => {});
 
     for (const field of data.fields) {
       await FormFiller.fillField(page, field);
     }
 
-    const networkSuccess = await FormFiller.submitForm(page, data.formSelector);
-    if (networkSuccess) {
-      return {
-        success: true,
-        reason: "POST request succeeded after submission",
-      };
+    const networkConfirmed = await FormFiller.submitForm(
+      page,
+      data.formSelector,
+    );
+
+    if (networkConfirmed) {
+      return { success: true, reason: "Confirmed via network activity" };
     }
 
+    // Fallback: Check page content via AI to see if a "Thank You" message appeared
     await new Promise((r) => setTimeout(r, SPA_SETTLE_DELAY));
-    const result = await FormFiller.analyzeSubmissionResult(page);
 
-    if (result.success) {
+    const text = await page.evaluate(() => document.body.innerText);
+    const aiResultRaw = await AI.detectFormSubmissionResult({
+      text: text.substring(0, 100000),
+      url: page.url(),
+    });
+
+    try {
+      const parsed = JSON.parse(aiResultRaw);
       return {
-        success: true,
-        reason: result.reason ?? "Submission confirmed by AI",
+        success: !!parsed.success,
+        note: parsed.reason || "AI analysis of page state",
       };
+    } catch {
+      return { success: false, reason: "Verification failed" };
     }
-
-    const isAmbiguous =
-      !result.reason || /unclear|unknown|unsure/i.test(result.reason);
-    if (isAmbiguous) {
-      return { success: true, note: "No error detected — assumed successful" };
-    }
-
-    return { success: false, reason: result.reason };
   }
 
   static async findAndFill(url: string, depth = 0): Promise<FillResult> {
     if (depth > MAX_DEPTH) {
-      return {
-        success: false,
-        reason: `Max navigation depth (${MAX_DEPTH}) exceeded`,
-      };
+      return { success: false, reason: "Max depth reached" };
     }
 
     const page = await BrowserService.launchPage(url);
 
-    let data: ContactPageData;
-
     try {
-      data = await FormFiller.analyzeContactPage(page);
+      const data = await FormFiller.analyzeContactPage(page);
+
+      if (data.blocked) {
+        return { success: false, reason: "Anti-bot detected" };
+      }
+
+      if (!data.found) {
+        if (
+          data.path &&
+          new URL(data.path, url).pathname !== new URL(url).pathname
+        ) {
+          // Continue
+        } else {
+          return { success: false, reason: "Contact link not found" };
+        }
+      }
+
+      if (data.path) {
+        const nextUrl = new URL(data.path, page.url()).toString();
+        // Crucial: Close current page before opening the next to prevent memory bloat
+        await BrowserService.closePage(page);
+        return await FormFiller.findAndFill(nextUrl, depth + 1);
+      }
+
+      if (data.foundContactFormOnPage) {
+        return await FormFiller.fillForm(page, data);
+      }
+
+      return {
+        success: false,
+        reason: "Contact page identified but no form found",
+      };
     } catch (err) {
-      await BrowserService.closePage(page);
       return { success: false, reason: (err as Error).message };
+    } finally {
+      if (!page.isClosed()) {
+        await BrowserService.closePage(page);
+      }
     }
-
-    if (data.blocked) {
-      await BrowserService.closePage(page);
-      return { success: false, reason: "Blocked by anti-bot protection" };
-    }
-
-    if (!data.found) {
-      await BrowserService.closePage(page);
-      return { success: false, reason: "No contact page found" };
-    }
-
-    if (data.foundContactFormOnPage) {
-      const result = await FormFiller.fillForm(page, data);
-      await BrowserService.closePage(page);
-      return result;
-    }
-
-    if (!data.path) {
-      await BrowserService.closePage(page);
-      return {
-        success: false,
-        reason: "Contact page detected but no path provided",
-      };
-    }
-
-    // Resolve relative paths against the current page URL
-    let nextUrl: string;
-    try {
-      nextUrl = new URL(data.path, page.url()).toString();
-    } catch {
-      await BrowserService.closePage(page);
-      return {
-        success: false,
-        reason: `Invalid path returned by AI: ${data.path}`,
-      };
-    }
-
-    await BrowserService.closePage(page);
-
-    // Recurse into the resolved contact URL
-    return FormFiller.findAndFill(nextUrl, depth + 1);
   }
 }

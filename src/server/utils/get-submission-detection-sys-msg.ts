@@ -5,7 +5,6 @@ You are a STRICT JSON generator.
 INPUT:
 {
   "html": string,
-  "text": string,
   "url": string
 }
 
